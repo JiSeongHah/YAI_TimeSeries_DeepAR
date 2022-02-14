@@ -33,8 +33,8 @@ class DeepARPredictor(nn.Module):
                  sigLin1,
                  sigLin2,
                  seqLen,
-                 windowRange,
-
+                 windowRangeTrn,
+                 windowRangeVal,
                  bSizeTrn= 8,
                  bSizeVal=1,
                  lr=3e-4,
@@ -58,7 +58,8 @@ class DeepARPredictor(nn.Module):
         self.sigLin2 = sigLin2
 
         self.seqLen = seqLen
-        self.windowRange = windowRange
+        self.windowRangeTrn = windowRangeTrn
+        self.windowRangeVal = windowRangeVal
 
         self.lr = lr
         self.eps = eps
@@ -153,7 +154,7 @@ class DeepARPredictor(nn.Module):
         with torch.set_grad_enabled(True):
             globalTime= time.time()
 
-            for idx,_,bInput, bLabel  in enumerate(self.trainDataloader):
+            for idx,_,bInput, bLabel in enumerate(self.trainDataloader):
 
                 localTime = time.time()
 
@@ -164,8 +165,8 @@ class DeepARPredictor(nn.Module):
                 bLabel = bLabel.float()
                 # bInput = bInput.to(self.device)
 
-                for t in range(self.windowRange):
-                    mu,sig,hidden,cell = self.forward(bInput[:,t,:])
+                for t in range(self.windowRangeTrn):
+                    mu,sig,hidden,cell = self.forward(bInput[:,t,:],hidden=hidden,cell=cell)
                     mu = mu.to('cpu')
                     sig = sig.to('cpu')
                     hidden = hidden.to('cpu')
@@ -174,53 +175,45 @@ class DeepARPredictor(nn.Module):
 
                     TotalLoss += ResultLoss
 
-
-                ResultLoss.backward()
-                self.loss_lst_trn_tmp.append(10000*float(ResultLoss.item()))
-
+                TotalLoss.backward()
                 if (countNum + 1) % self.iter_to_accumul == 0:
+                    localTimeElaps = round(time.time() - localTime, 2)
+                    globalTimeElaps = round(time.time() - globalTime, 2)
+                    print(
+                        f'globaly {globalTimeElaps} elapsed and locally {localTimeElaps} elapsed for {countNum} / {self.MaxStep}'
+                        f' of epoch : {trainingNum}/{self.MaxEpoch}'
+                        f' with loss : {TotalLoss.item()}')
                     self.optimizer.step()
                     self.optimizer.zero_grad()
 
-                if countNum == self.MaxStep:
-                    break
-                else:
-                    countNum += 1
-
-                localTimeElaps = round(time.time() - localTime,2)
-                globalTimeElaps = round(time.time() - globalTime,2)
-
-                print(f'globaly {globalTimeElaps} elapsed and locally {localTimeElaps} elapsed for {countNum} / {self.MaxStep}'
-                      f' of epoch : {trainingNum}/{self.MaxEpoch}'
-                      f' with loss : {10000*float(ResultLoss.item())}')
-
-        self.loss_lst_trn.append(self.iter_to_accumul * np.mean(self.loss_lst_trn_tmp))
-        print(f'training complete with mean loss : {self.iter_to_accumul * np.mean(self.loss_lst_trn_tmp)}')
-        self.loss_lst_trn_tmp = []
-
         torch.set_grad_enabled(False)
-        self.EelModel.eval()
+        self.DeepArModel.eval()
 
     def valdatingStep(self,validatingNum):
 
-        self.EelModel.eval()
+        self.DeepArModel.eval()
         countNum = 0
         self.optimizer.zero_grad()
 
         with torch.set_grad_enabled(False):
             for _,valBInput, valBLabel in self.valDataloader:
 
-                valBInput = valBInput.to(self.device)
+                TotalLoss = torch.zeros(1)
+                hidden = self.init_hidden_cell(self.bSizeTrn)
+                cell = self.init_hidden_cell(self.bSizeTrn)
 
-                valBLogit = self.forward(valBInput)
-                valBLogit = valBLogit.cpu()
+                valBLabel = valBLabel.float()
+                # bInput = bInput.to(self.device)
 
-                ResultLoss = self.calLoss(valBLogit,valBLabel)
+                for t in range(self.windowRangeVal):
+                    mu, sig, hidden, cell = self.forward(valBInput[:, t, :], hidden=hidden, cell=cell)
+                    mu = mu.to('cpu')
+                    sig = sig.to('cpu')
+                    hidden = hidden.to('cpu')
+                    cell = cell.to('cpu')
+                    ResultLoss = self.calLoss(mu=mu, sig=sig, label=valBLabel)
 
-                ResultLoss = ResultLoss / self.iter_to_accumul
-                self.loss_lst_val_tmp.append(10000*float(ResultLoss.item()))
-
-                print(f'{countNum}/ {self.MaxStepVal} th val of epoch : {validatingNum} complete with loss : {10000 * float(ResultLoss.item())}')
+                    TotalLoss += ResultLoss
 
                 if countNum == self.MaxStepVal:
                     break
@@ -232,7 +225,7 @@ class DeepARPredictor(nn.Module):
             self.loss_lst_val_tmp = []
 
         torch.set_grad_enabled(True)
-        self.EelModel.train()
+        self.DeepArModel.train()
 
     def TestStep(self):
 
