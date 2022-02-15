@@ -14,38 +14,45 @@ import time
 import csv
 from torch.nn import L1Loss
 from sklearn.metrics import f1_score
-from MY_MODELS import EelPredCNNModel
-from DEEPARPREDICTOR import EelPredictor
+from MY_MODELS import MyDeepAR
+from DEEPARPREDICTOR import DeepARPredictor
 
 if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    baseDir = '/home/a286winteriscoming/Downloads/EelPred/datasetVer1/dataset/'
-    #baseDir = '/home/a286/hjs_dir1/Dacon1/'
+    baseDir = '/home/a286winteriscoming/Downloads/g-research-crypto-forecasting/dataset/'
 
     data_folder_dir_trn = baseDir + 'train/'
     data_folder_dir_val  = baseDir + 'val/'
-    labelDir = baseDir + 'train.csv'
     data_folder_dir_test = baseDir + 'test/'
 
-    backboneOutFeature = 1000
-    LinNum = 25
 
-    MaxEpoch= 10000
-    iter_to_accumul = 4
-    MaxStep = 25
-    MaxStepVal = 10000
-    bSizeTrn = 4
+
+    coin = 'Bitcoin'
+    iter_to_accumul = 1
+    inputSize = 4
+    hiddenSize = 128
+    numLayer = 3
+    muLin1 = 128
+    muLin2,= 128
+    sigLin1 = 128
+    sigLin2 = 128
+    seqLen = 128+15
+    windowRangeTrn = 1
+    windowRangeVal = 1
+    windowRangeTst = 128
+    sigmaNum = 2
+    bSizeTrn = 64,
+    bSizeVal = 64,
+    bSizeTst = 1,
+
+    modelLoadNum = 1
     save_range= 100
-    modelLoadNum = 500
-    CROP = [0,1000,300,1500]
-    gpuUse = True
-    whichModel= 'resnet101'
-    lossFuc = 'L1'
+    MaxEpoch = 10000
 
 
 
-    savingDir = mk_name(model=whichModel,backNum=backboneOutFeature,LinNum=LinNum,bS=bSizeTrn,iter=iter_to_accumul,loss=lossFuc)
+    savingDir = mk_name(mu1=muLin1,mu2=muLin2,sig1=sigLin1,sig2=sigLin2,wdw=windowRangeTst,signum=2,bs=64)
     modelPlotSaveDir = baseDir +'Results/'+savingDir + '/'
     createDirectory(modelPlotSaveDir)
 
@@ -54,24 +61,30 @@ if __name__ == '__main__':
         print(f'Loading {modelPlotSaveDir + str(modelLoadNum)}.pth')
         MODEL_START = torch.load(modelPlotSaveDir + str(modelLoadNum) + '.pth')
     except:
-        MODEL_START  = EelPredictor(
-            data_folder_dir_trn=data_folder_dir_trn,
-            data_folder_dir_val=data_folder_dir_val,
-            MaxEpoch=MaxEpoch,
-            backboneOutFeature=backboneOutFeature,
-            LinNum=LinNum,
-            lossFuc=lossFuc,
-            labelDir=labelDir,
-            modelPlotSaveDir=modelPlotSaveDir,
-            iter_to_accumul=iter_to_accumul,
-            MaxStep=MaxStep,
-            MaxStepVal=MaxStepVal,
-            bSizeTrn=bSizeTrn,
-            gpuUse=gpuUse,
-            CROP=CROP,
-            data_folder_dir_test=data_folder_dir_test,
-            whichModel=whichModel,
-            bSizeVal=10, lr=3e-4, eps=1e-9)
+        MODEL_START  = DeepARPredictor(
+            data_folder_dir_trn= data_folder_dir_trn,
+            data_folder_dir_val = data_folder_dir_val,
+            data_folder_dir_test = data_folder_dir_test,
+            modelPlotSaveDir = modelPlotSaveDir,
+            coin = coin,
+            iter_to_accumul = iter_to_accumul,
+            inputSize = inputSize,
+            hiddenSize= hiddenSize,
+            numLayer = numLayer,
+            muLin1 = muLin1,
+            muLin2 = muLin2,
+            sigLin1 = sigLin1,
+            sigLin2 = sigLin2,
+            seqLen =seqLen,
+            windowRangeTrn = windowRangeTrn,
+            windowRangeVal = windowRangeVal,
+            windowRangeTst = windowRangeTst,
+            sigmaNum= sigmaNum,
+            bSizeTrn= bSizeTrn,
+            bSizeVal= bSizeVal,
+            bSizeTst= bSizeTst
+        )
+
 
 
     #MODEL_START.TestStep()
