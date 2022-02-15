@@ -40,6 +40,9 @@ class DeepARPredictor(nn.Module):
                  windowRangeTrn,
                  windowRangeVal,
                  windowRangeTst,
+                 MaxStepTrn,
+                 MaxStepVal,
+                 gpuUse,
                  sigmaNum=3,
                  bSizeTrn= 8,
                  bSizeVal=1,
@@ -54,11 +57,14 @@ class DeepARPredictor(nn.Module):
         self.data_folder_dir_val = data_folder_dir_val
         self.data_folder_dir_test = data_folder_dir_test
 
+        self.modelPlotSaveDir = modelPlotSaveDir
+
         self.iter_to_accumul = iter_to_accumul
         self.coin = coin
+        self.gpuUse = gpuUse
 
         self.inputSize = inputSize
-        self.hiddenSzie = hiddenSize
+        self.hiddenSize = hiddenSize
         self.numLayer=  numLayer
         self.muLin1 = muLin1
         self.muLin2 = muLin2
@@ -70,6 +76,9 @@ class DeepARPredictor(nn.Module):
         self.windowRangeVal = windowRangeVal
         self.windowRangeTst = windowRangeTst
 
+        self.MaxStepTrn = MaxStepTrn
+        self.MaxStepVal = MaxStepVal
+
         self.lr = lr
         self.eps = eps
         self.bSizeTrn = bSizeTrn
@@ -78,14 +87,12 @@ class DeepARPredictor(nn.Module):
 
         self.sigmaNum =sigmaNum
 
-        self.modelPlotSaveDir = modelPlotSaveDir
-
         ###################MODEL SETTING###########################
         print('failed loading model, loaded fresh model')
 
         self.DeepArModel = MyDeepAR(
             inputSize=self.inputSize,
-            hiddenSize=self.hiddenSzie,
+            hiddenSize=self.hiddenSize,
             numLayer=self.numLayer,
             muLin1=self.muLin1,
             muLin2 = self.muLin2,
@@ -137,7 +144,7 @@ class DeepARPredictor(nn.Module):
             baseDir=self.data_folder_dir_trn,
             coin=self.coin
         )
-        self.testDataloader = DataLoader(MyTestDataset,batch_size=1,shuffle=False)
+        self.testDataloader = DataLoader(MyTestDataset,batch_size=self.bSizeTst,shuffle=False)
 
 
         self.DeepArModel.to(device=self.device)
@@ -160,9 +167,9 @@ class DeepARPredictor(nn.Module):
         likelihood = distribution.log_prob(label)
         return -torch.mean(likelihood)
 
-    def init_hidden_cell(self, input_size):
+    def init_hidden_cell(self,batchSize):
 
-        return torch.zeros(self.numLayer, self.inputSize, self.hiddenSize)
+        return torch.zeros(self.numLayer, batchSize, self.hiddenSize)
 
 
     def trainingStep(self,trainingNum):
@@ -177,19 +184,24 @@ class DeepARPredictor(nn.Module):
 
                 localTime = time.time()
 
+                print(f'size of bx is : {bX.size()}')
+                print(f'size of bz is : {bZ.size()}')
+
                 TotalLoss = torch.zeros(1)
-                hidden = self.init_hidden_cell(self.bSizeTrn)
-                cell = self.init_hidden_cell(self.bSizeTrn)
+                hidden = self.init_hidden_cell(batchSize=bX.size(0))
+                cell = self.init_hidden_cell(batchSize=bX.size(0))
 
                 bZ = bZ.float()
                 # bInput = bInput.to(self.device)
 
                 for t in range(self.windowRangeTrn):
                     if t == 0:
-                        Z0 = torch.tensor(bX.size(0))
-                        bInput = torch.cat((bX[:,t,:],Z0),dim=2)
+                        Z0 = torch.zeros(bX.size(0),1)
+                        print(f'Z0 size is : {Z0.size()} and bXsize is : {bX[:,t,:].size()}')
+
+                        bInput = torch.unsqueeze(torch.cat((bX[:,t,:],Z0),dim=1),dim=1)
                     else:
-                        bInput = torch.cat((bX[:, t, :], bZ[:, t - 1, :]), dim=2)
+                        bInput = torch.unsqueeze(torch.cat((bX[:, t, :], bZ[:, t - 1, :]), dim=1),dim=1)
 
                     mu,sig,hidden,cell = self.forward(bInput,hidden=hidden,cell=cell)
                     mu = mu.to('cpu')
@@ -200,16 +212,23 @@ class DeepARPredictor(nn.Module):
 
                     TotalLoss += ResultLoss
 
+                self.loss_lst_trn_tmp.append(TotalLoss.item())
                 TotalLoss.backward()
                 if (idx + 1) % self.iter_to_accumul == 0:
                     localTimeElaps = round(time.time() - localTime, 2)
                     globalTimeElaps = round(time.time() - globalTime, 2)
                     print(
-                        f'globaly {globalTimeElaps} elapsed and locally {localTimeElaps} elapsed for {idx} / {self.MaxStep}'
-                        f' of epoch : {trainingNum}/{self.MaxEpoch}'
+                        f'globaly {globalTimeElaps} elapsed and locally {localTimeElaps} elapsed for {idx} / {self.MaxStepTrn}'
+                        f' of epoch : {trainingNum}/{len(self.trainDataloader)}'
                         f' with loss : {TotalLoss.item()}')
                     self.optimizer.step()
                     self.optimizer.zero_grad()
+
+                    self.loss_lst_trn.append(np.sum(self.loss_lst_trn_tmp))
+                    self.loss_lst_trn_tmp = []
+
+                if idx >= self.MaxStepTrn:
+                    break
 
         torch.set_grad_enabled(False)
         self.DeepArModel.eval()
@@ -223,17 +242,17 @@ class DeepARPredictor(nn.Module):
             for idx,(bXVal,bZVal) in enumerate(self.valDataloader):
 
                 TotalLoss = torch.zeros(1)
-                hidden = self.init_hidden_cell(self.bSizeVal)
-                cell = self.init_hidden_cell(self.bSizeVal)
+                hidden = self.init_hidden_cell(batchSize=bXVal.size(0))
+                cell = self.init_hidden_cell(batchSize=bXVal.size(0))
 
                 bZVal = bZVal.float()
 
                 for t in range(self.windowRangeVal):
                     if t == 0:
-                        Z0Val = torch.tensor(bXVal.size(0))
-                        bInputVal = torch.cat((bXVal[:, t, :], Z0Val), dim=2)
+                        Z0Val = torch.zeros(bXVal.size(0),1)
+                        bInputVal = torch.unsqueeze(torch.cat((bXVal[:, t, :], Z0Val), dim=1),dim=1)
                     else:
-                        bInputVal = torch.cat((bXVal[:, t, :], bZVal[:, t - 1, :]), dim=2)
+                        bInputVal = torch.unsqueeze(torch.cat((bXVal[:, t, :], bZVal[:, t - 1, :]), dim=1),dim=1)
 
                     mu, sig, hidden, cell = self.forward(bInputVal, hidden=hidden, cell=cell)
                     mu = mu.to('cpu')
@@ -244,9 +263,16 @@ class DeepARPredictor(nn.Module):
                     ResultLoss = self.calLoss(mu=mu,sig=sig,label=bZVal[:,t,:])
                     TotalLoss += ResultLoss
 
-            self.loss_lst_val.append(self.iter_to_accumul*np.mean(self.loss_lst_val_tmp))
-            print(f'validation complete with mean loss : {self.iter_to_accumul*np.mean(self.loss_lst_val_tmp)}')
-            self.loss_lst_val_tmp = []
+                self.loss_lst_val_tmp.append(TotalLoss.item())
+                if (idx + 1) % self.iter_to_accumul == 0:
+                    self.loss_lst_val.append(np.sum(self.loss_lst_val_tmp))
+                    self.loss_lst_val_tmp = []
+
+                if idx >= self.MaxStepVal:
+                    break
+
+            print(f'validation complete with mean loss : {self.loss_lst_val[-1]}')
+
 
         torch.set_grad_enabled(True)
         self.DeepArModel.train()
@@ -261,65 +287,96 @@ class DeepARPredictor(nn.Module):
         with torch.set_grad_enabled(False):
             for idx,(bXTst,bZTst) in enumerate(self.testDataloader):
 
-                if idx > 1:
+                if idx >= 1:
                     break
 
+                print(f'yes is : {bZTst.size()}')
+
                 TotalLoss = torch.zeros(1)
-                hidden = self.init_hidden_cell(self.bSizeTst)
-                cell = self.init_hidden_cell(self.bSizeTst)
+                hidden = self.init_hidden_cell(batchSize=bXTst.size(0))
+                cell = self.init_hidden_cell(batchSize=bXTst.size(0))
 
                 bZTst = bZTst.float()
 
                 for t in range(self.windowRangeTst):
                     if t == 0:
-                        Z0Tst = torch.tensor(bXTst.size(0))
-                        bInputTst = torch.cat((bXTst[:, t, :], Z0Tst), dim=2)
+                        Z0Tst = torch.zeros(bXTst.size(0),1)
+                        bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], Z0Tst), dim=1),dim=1)
                     else:
-                        bInputTst = torch.cat((bXTst[:, t, :], bZTst[:, t - 1, :]), dim=2)
+                        bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], bZTst[:, t - 1, :]), dim=1),dim=1)
 
                     mu, sig, hidden, cell = self.forward(bInputTst, hidden=hidden, cell=cell)
+
                     mu = mu.to('cpu')
                     sig = sig.to('cpu')
                     hidden = hidden.to('cpu')
                     cell = cell.to('cpu')
 
-                    ResultLst.append([bZTst[:,t,:],bZTst[:,t,:],mu,sig])
+                    bzTst_copy = bZTst[:, t, :].clone().detach().to('cpu')
+                    mu_copy = mu.clone().detach().to('cpu')
+                    sig_copy = sig.clone().detach().to('cpu')
+
+                    ResultLst.append([bzTst_copy, bzTst_copy, mu_copy, sig_copy])
+
+
 
                 for t in range(self.windowRangeTst,self.seqLen):
                     if t == self.windowRangeTst:
-                        bInputTst = torch.cat((bXTst[:, t, :], bZTst[:, t - 1, :]), dim=2)
+                        bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], bZTst[:, t - 1, :]), dim=1),dim=1)
 
                         mu, sig, hidden, cell = self.forward(bInputTst, hidden=hidden, cell=cell)
+
                         gaussian = torch.distributions.normal.Normal(mu,sig)
                         z_pred = gaussian.sample()
+                        z_pred = z_pred.to('cpu')
 
-                        ResultLst.append([z_pred, bZTst[:, t, :], mu, sig])
+                        z_pred_copy = z_pred.clone().detach().to('cpu')
+                        bzTst_copy = bZTst[:,t,:].clone().detach().to('cpu')
+                        mu_copy = mu.clone().detach().to('cpu')
+                        sig_copy = sig.clone().detach().to('cpu')
+
+                        ResultLst.append([z_pred_copy,bzTst_copy,mu_copy,sig_copy])
                     else:
-                        bInputTst = torch.cat((bXTst[:, t, :], z_pred), dim=2)
+
+                        bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], torch.unsqueeze(z_pred,dim=1)), dim=1),dim=1)
                         mu, sig, hidden, cell = self.forward(bInputTst, hidden=hidden, cell=cell)
                         gaussian = torch.distributions.normal.Normal(mu, sig)
                         z_pred = gaussian.sample()
-                        ResultLst.append([z_pred, bZTst[:, t, :], mu, sig])
+                        z_pred = z_pred.to('cpu')
 
-            predLst = []
-            labelLst = []
-            lowerBoundLst= []
-            upperBoundLst = []
-            for i in ResultLst:
-                predLst.append(i[0])
-                labelLst.append(i[1])
-                lowerBoundLst.append(i[2]-self.sigmaNum*i[3])
-                upperBoundLst.append(i[2] + self.sigmaNum * i[3])
-            plt.plot(range(len(predLst)),predLst,'r')
-            plt.plot(range(len(labelLst)), labelLst,'b')
-            plt.fill_between(range(len(predLst)),lowerBoundLst,upperBoundLst,color='g',alpha=.1)
-            plt.show()
+                        z_pred_copy = z_pred.clone().detach().to('cpu')
+                        bzTst_copy = bZTst[:, t, :].clone().detach().to('cpu')
+                        mu_copy = mu.clone().detach().to('cpu')
+                        sig_copy = sig.clone().detach().to('cpu')
+
+                        ResultLst.append([z_pred_copy, bzTst_copy, mu_copy, sig_copy])
+
+
+            for each in range(len(ResultLst[0][0])):
+                predLst = []
+                labelLst = []
+                lowerBoundLst = []
+                upperBoundLst = []
+
+                for i in ResultLst:
+                    predLst.append(i[0][each])
+                    labelLst.append(i[1][each])
+                    lowerBoundLst.append(i[2][each]-self.sigmaNum*i[3][each])
+                    upperBoundLst.append(i[2][each] + self.sigmaNum * i[3][each])
+
+
+                plt.plot(range(len(predLst)),predLst,'r')
+                plt.plot(range(len(labelLst)), labelLst,'b')
+                plt.fill_between(range(len(predLst)),lowerBoundLst,upperBoundLst,color='g',alpha=.1)
+                plt.savefig(self.modelPlotSaveDir+'TestResult_'+str(each)+'.png',dpi=200)
+                plt.show()
+                plt.close()
 
         torch.set_grad_enabled(True)
         self.DeepArModel.train()
 
 
-    def START_TRN_VAL(self,epoch):
+    def START_TRN_VAL(self,epoch,MaxEpoch):
 
 
         print('training step start....')
@@ -340,11 +397,11 @@ class DeepARPredictor(nn.Module):
         ax3.set_title('val loss')
 
 
-        plt.savefig(self.modelPlotSaveDir +  'Result.png', dpi=300)
+        plt.savefig(self.modelPlotSaveDir +  'LossResult.png', dpi=200)
         print('saving plot complete!')
         plt.close()
 
-        print(f'num4epoch is : {epoch} and self.max_epoch : {self.MaxEpoch}')
+        print(f'num4epoch is : {epoch} and self.max_epoch : {MaxEpoch}')
 
     def START_TEST(self):
 

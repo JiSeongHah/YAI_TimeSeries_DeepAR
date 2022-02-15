@@ -30,11 +30,11 @@ if __name__ == '__main__':
 
     coin = 'Bitcoin'
     iter_to_accumul = 1
-    inputSize = 4
+    inputSize = 5
     hiddenSize = 128
     numLayer = 3
     muLin1 = 128
-    muLin2,= 128
+    muLin2= 128
     sigLin1 = 128
     sigLin2 = 128
     seqLen = 128+15
@@ -42,24 +42,25 @@ if __name__ == '__main__':
     windowRangeVal = 1
     windowRangeTst = 128
     sigmaNum = 2
-    bSizeTrn = 64,
-    bSizeVal = 64,
-    bSizeTst = 1,
+    bSizeTrn = 3
+    bSizeVal = 3
+    bSizeTst = 4
+    MaxStepTrn = 128
+    MaxStepVal =128
 
     modelLoadNum = 1
     save_range= 100
     MaxEpoch = 10000
-
-
+    gpuUse= True
 
     savingDir = mk_name(mu1=muLin1,mu2=muLin2,sig1=sigLin1,sig2=sigLin2,wdw=windowRangeTst,signum=2,bs=64)
     modelPlotSaveDir = baseDir +'Results/'+savingDir + '/'
     createDirectory(modelPlotSaveDir)
-
+    createDirectory(modelPlotSaveDir+'models')
 
     try:
         print(f'Loading {modelPlotSaveDir + str(modelLoadNum)}.pth')
-        MODEL_START = torch.load(modelPlotSaveDir + str(modelLoadNum) + '.pth')
+        MODEL_START = torch.load(modelPlotSaveDir +'models/'+ str(modelLoadNum) + '.pth')
     except:
         MODEL_START  = DeepARPredictor(
             data_folder_dir_trn= data_folder_dir_trn,
@@ -79,25 +80,28 @@ if __name__ == '__main__':
             windowRangeTrn = windowRangeTrn,
             windowRangeVal = windowRangeVal,
             windowRangeTst = windowRangeTst,
+            MaxStepTrn=MaxStepTrn,
+            MaxStepVal=MaxStepVal,
             sigmaNum= sigmaNum,
             bSizeTrn= bSizeTrn,
             bSizeVal= bSizeVal,
-            bSizeTst= bSizeTst
+            bSizeTst= bSizeTst,
+            gpuUse= gpuUse,
         )
 
 
 
-    #MODEL_START.TestStep()
+    # MODEL_START.TestStep()
 
     for i in range(10000):
-        MODEL_START.START_TRN_VAL(epoch=i)
+        MODEL_START.START_TRN_VAL(epoch=i,MaxEpoch=MaxEpoch)
 
         if i%save_range ==0:
             if i > MaxEpoch:
                 break
 
             try:
-                torch.save(MODEL_START, modelPlotSaveDir + str(i) + '.pth')
+                torch.save(MODEL_START, modelPlotSaveDir+'models/' + str(i) + '.pth')
                 print('saving model complete')
                 time.sleep(5)
             except:

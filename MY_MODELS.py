@@ -26,8 +26,6 @@ class simpleDNN(nn.Module):
         return out
 
 
-
-
 class MyDeepAR(torch.nn.Module):
 
     def __init__(self,inputSize,
@@ -82,18 +80,23 @@ class MyDeepAR(torch.nn.Module):
 
     def forward(self, x,hidden,cell):
 
-        lstmOut, (hidden,cell) = self.lstm(x,hidden,cell)
+
+        lstmOut, (hidden,cell) = self.lstm(x,(hidden,cell))
+
 
         muOut = self.mu1(lstmOut)
         muOut = self.mu2(muOut)
         muOut = self.mu3(muOut)
+
 
         sigOut = self.sig1(lstmOut)
         sigOut = self.sig2(sigOut)
         sigOut = self.sig3(sigOut)
         sigOut = self.distribution_sigma(sigOut)
 
+
         return torch.squeeze(muOut), torch.squeeze(sigOut), hidden, cell
+
 
 
 
