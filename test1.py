@@ -217,13 +217,44 @@
 
 import torch
 import torch.nn as nn
+import csv
+import numpy as np
+
+lst = [i for i in range(100)]
+idx = 17
+
+wdw = 5
+seqlen = wdw +7
+
+print(lst[idx-wdw+1:idx+seqlen-wdw+1],len(lst[idx-wdw:idx+seqlen-wdw]))
+Result= lst[idx-wdw+1:idx+seqlen-wdw+1]
+
+print(Result[wdw])
 
 
-x = torch.zeros(1,3,5)
 
-mu = torch.mean(x,dim=1).squeeze()
-sig = x.std(dim=1)
 
-print(mu.size())
-print('-0-00000000000000')
-print(sig.size())
+
+# baseDir = '/home/a286winteriscoming/Downloads/g-research-crypto-forecasting/dataset/'
+#
+# dir1 = baseDir + 'train/Bitcoin.csv'
+# dir2 = baseDir + 'val/Bitcoin.csv'
+# dir3 = baseDir + 'test/Bitcoin.csv'
+#
+# with open(dir1,'r') as f:
+#     rdr = csv.reader(f)
+#     lst1= list(rdr)
+#
+# with open(dir2,'r') as f:
+#     rdr = csv.reader(f)
+#     lst2 = list(rdr)
+#
+# with open(dir3,'r') as f:
+#     rdr = csv.reader(f)
+#     lst3 = list(rdr)
+#
+# print(f'start of train.csv is : {lst1[1][0]}end of train.csv is : {lst1[-1][0]} ')
+# print(f'start of val.csv is : {lst2[1][0]} end of val.csv is : {lst2[-1][0]} ')
+# print(f'start of test.csv is : {lst3[1][0]} end of test.csv is : {lst3[-1][0]} ')
+
+

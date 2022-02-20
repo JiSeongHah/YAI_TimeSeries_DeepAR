@@ -143,8 +143,9 @@ class DeepARPredictor(nn.Module):
 
         self.MyTestDataset = DeepARTestDataset(
             seqLen=self.seqLen,
-            baseDir=self.data_folder_dir_trn,
-            coin=self.coin
+            baseDir=self.data_folder_dir_test,
+            coin=self.coin,
+            windowRangeTst=windowRangeTst
         )
 
         self.DeepArModel.to(device=self.device)
@@ -167,7 +168,7 @@ class DeepARPredictor(nn.Module):
         likelihood = distribution.log_prob(label)
 
         #print(-torch.mean(likelihood))
-        print(mu,label)
+
         return -torch.mean(likelihood)
 
     def init_hidden_cell(self,batchSize):
@@ -191,13 +192,12 @@ class DeepARPredictor(nn.Module):
                 hidden = self.init_hidden_cell(batchSize=bX.size(0))
                 cell = self.init_hidden_cell(batchSize=bX.size(0))
 
-                bZ = bZ.float()
+                # bZ = bZ.float()
                 # bInput = bInput.to(self.device)
 
                 for t in range(self.windowRangeTrn):
                     if t == 0:
                         Z0 = torch.zeros(bX.size(0),1)
-
 
                         bInput = torch.unsqueeze(torch.cat((bX[:,t,:],Z0),dim=1),dim=1)
                     else:
@@ -209,6 +209,7 @@ class DeepARPredictor(nn.Module):
                     hidden = hidden.to('cpu')
                     cell = cell.to('cpu')
                     ResultLoss = self.calLoss(mu=mu,sig=sig,label=bZ[:,t,:])
+                    print(f'mu : {mu[0]} , label : {bZ[0, t, :].item()}, diff : {abs(mu[0] - bZ[0, t, :].item())}')
 
                     TotalLoss += ResultLoss
 
@@ -245,7 +246,7 @@ class DeepARPredictor(nn.Module):
                 hidden = self.init_hidden_cell(batchSize=bXVal.size(0))
                 cell = self.init_hidden_cell(batchSize=bXVal.size(0))
 
-                bZVal = bZVal.float()
+                # bZVal = bZVal.float()
 
                 for t in range(self.windowRangeVal):
                     if t == 0:
@@ -259,6 +260,8 @@ class DeepARPredictor(nn.Module):
                     sig = sig.to('cpu')
                     hidden = hidden.to('cpu')
                     cell = cell.to('cpu')
+
+                    print(f'mu : {mu[0]} , label : {bZVal[0, t, :].item()}, diff : {abs(mu[0] - bZVal[0, t, :].item())}')
 
                     ResultLoss = self.calLoss(mu=mu,sig=sig,label=bZVal[:,t,:])
                     TotalLoss += ResultLoss
@@ -292,8 +295,6 @@ class DeepARPredictor(nn.Module):
 
             bXTst,bZTst = self.MyTestDataset.getItem(timeStamp=timeStamp)
 
-
-
             samples = torch.zeros(1,self.sampleNum,self.seqLen - self.windowRangeTst)
 
             TotalLoss = torch.zeros(1)
@@ -320,6 +321,7 @@ class DeepARPredictor(nn.Module):
                 bzTst_copy = bZTst[:, t, :].clone().detach().to('cpu')
                 mu_copy = mu.clone().detach().to('cpu')
                 sig_copy = sig.clone().detach().to('cpu')
+                print(f'mu : {mu} and label : {bzTst_copy.item()} diff : {abs(mu - bzTst_copy.item())}')
 
 
                 predLst.append(bzTst_copy)
@@ -346,12 +348,15 @@ class DeepARPredictor(nn.Module):
                         z_pred = z_pred.to('cpu')
 
                         z_pred_copy = z_pred.clone().detach().to('cpu')
+
                         samples[0,samplestep,t-self.windowRangeTst] = z_pred_copy
 
                         bzTst_copy = bZTst[:,t,:].clone().detach().to('cpu')
+
                         if samplestep == 0:
                             labelLst.append(bzTst_copy)
 
+                        print(f'z_pred : {z_pred} and label : {bzTst_copy.item()} diff : {abs(z_pred-bzTst_copy.item())}')
                         mu_copy = mu.clone().detach().to('cpu')
                         sig_copy = sig.clone().detach().to('cpu')
 
@@ -373,7 +378,7 @@ class DeepARPredictor(nn.Module):
                         bzTst_copy = bZTst[:, t, :].clone().detach().to('cpu')
                         if samplestep == 0:
                             labelLst.append(bzTst_copy)
-
+                        print(f'z_pred : {z_pred} and label : {bzTst_copy.item()} diff : {abs(z_pred-bzTst_copy.item())}')
                         mu_copy = mu.clone().detach().to('cpu')
                         sig_copy = sig.clone().detach().to('cpu')
 

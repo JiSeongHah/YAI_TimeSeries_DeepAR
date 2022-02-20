@@ -41,7 +41,7 @@ if __name__ == '__main__':
     seqLen = windowRangeTst+15
     windowRangeTrn = 1
     windowRangeVal = 1
-    sigmaNum = 0.1
+    sigmaNum = 1
     bSizeTrn = 2048
     bSizeVal = 2048
     bSizeTst = 100
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     MaxStepVal =128
     sampleNum = 1024
 
-    modelLoadNum = 2300
+    modelLoadNum = 900
     save_range= 100
     MaxEpoch = 100000
     gpuUse= True
@@ -91,7 +91,7 @@ if __name__ == '__main__':
             sampleNum=sampleNum
         )
 
-    #MODEL_START.TestStep()
+    MODEL_START.TestStep(timeStamp=1624846200)
 
     for i in range(10000):
         MODEL_START.START_TRN_VAL(epoch=i,MaxEpoch=MaxEpoch)

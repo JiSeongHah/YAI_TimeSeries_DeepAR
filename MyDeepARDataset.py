@@ -11,6 +11,8 @@ class DeepARDataset(Dataset):
         self.coin = coin
         self.loadDataDir = self.baseDir+self.coin+'.csv'
 
+
+
         self.seqLen = seqLen
 
         with open(self.loadDataDir,'r') as f:
@@ -38,8 +40,8 @@ class DeepARDataset(Dataset):
 
         Zt = self.ZtTensor[idx:idx+self.seqLen,:]
 
-        Xt = Xt / firstDayOpen
-        Zt = Zt / firstDayOpen
+        Xt = Xt / firstDayOpen -torch.ones_like(Xt)
+        Zt = Zt / firstDayOpen -torch.ones_like(Zt)
 
         # print(Xt[:,1])
 
@@ -47,13 +49,14 @@ class DeepARDataset(Dataset):
 
 
 class DeepARTestDataset():
-    def __init__(self,seqLen,baseDir,coin='Bitcoin'):
+    def __init__(self,seqLen,baseDir,windowRangeTst,coin='Bitcoin'):
 
         self.baseDir = baseDir
         self.coin = coin
         self.loadDataDir = self.baseDir+self.coin+'.csv'
 
         self.seqLen = seqLen
+        self.windowRangeTst = windowRangeTst
 
         with open(self.loadDataDir,'r') as f:
             rdr = csv.reader(f)
@@ -74,28 +77,21 @@ class DeepARTestDataset():
     def getItem(self, timeStamp):
 
         idx = np.where(self.timeStampArr == timeStamp)[0][0]
+        print(f'dir is : {self.loadDataDir}')
+        print(f'idx is : {idx} and timestamp is : {timeStamp}')
 
-        Xt = self.XtTensor[idx:idx+self.seqLen,:]
-        firstDayOpen = Xt[0,0].clone().detach()
+        Xt = self.XtTensor[idx-self.windowRangeTst+1:idx+self.seqLen-self.windowRangeTst+1,:]
+        tzeroDayOpen = self.XtTensor[idx,0].clone().detach()
 
-        Zt = self.ZtTensor[idx:idx+self.seqLen,:]
+        Zt = self.ZtTensor[idx-self.windowRangeTst+1:idx+self.seqLen-self.windowRangeTst+1,:]
 
-        Xt = Xt / firstDayOpen
-        Zt = Zt / firstDayOpen
+        Xt = Xt / tzeroDayOpen
+        Zt = Zt / tzeroDayOpen
 
 
         return Xt.unsqueeze(0), Zt.unsqueeze(0)
 
 
-# x = DeepARTestDataset(seqLen=128,baseDir='/home/a286winteriscoming/Downloads/g-research-crypto-forecasting/dataset/test/')
-#
-# ITEM = x.getItem(timeStamp=float(1514768940
-#
-# )
-#
-# )
-#
-# print(I
 
 
 
