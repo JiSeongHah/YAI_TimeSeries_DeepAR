@@ -17,7 +17,7 @@ from sklearn.metrics import f1_score
 from efficientnet_pytorch import EfficientNet
 from torch.nn import DataParallel
 from torchvision import models
-from MyDeepARDataset import DeepARDataset
+from MyDeepARDataset import DeepARDataset,DeepARTestDataset
 import matplotlib.pyplot as plt
 
 
@@ -43,6 +43,7 @@ class DeepARPredictor(nn.Module):
                  MaxStepTrn,
                  MaxStepVal,
                  gpuUse,
+                 sampleNum,
                  sigmaNum=3,
                  bSizeTrn= 8,
                  bSizeVal=1,
@@ -71,6 +72,7 @@ class DeepARPredictor(nn.Module):
         self.sigLin1= sigLin1
         self.sigLin2 = sigLin2
 
+        self.sampleNum = sampleNum
         self.seqLen = seqLen
         self.windowRangeTrn = windowRangeTrn
         self.windowRangeVal = windowRangeVal
@@ -139,13 +141,11 @@ class DeepARPredictor(nn.Module):
         )
         self.valDataloader = DataLoader(MyValDataset, batch_size=self.bSizeVal, shuffle=False)
 
-        MyTestDataset = DeepARDataset(
+        self.MyTestDataset = DeepARTestDataset(
             seqLen=self.seqLen,
             baseDir=self.data_folder_dir_trn,
             coin=self.coin
         )
-        self.testDataloader = DataLoader(MyTestDataset,batch_size=self.bSizeTst,shuffle=False)
-
 
         self.DeepArModel.to(device=self.device)
 
@@ -162,9 +162,12 @@ class DeepARPredictor(nn.Module):
 
 
     def calLoss(self,mu,sig,label):
-
+        #print(mu,sig,label)
         distribution = torch.distributions.normal.Normal(mu, sig)
         likelihood = distribution.log_prob(label)
+
+        #print(-torch.mean(likelihood))
+        print(mu,label)
         return -torch.mean(likelihood)
 
     def init_hidden_cell(self,batchSize):
@@ -184,9 +187,6 @@ class DeepARPredictor(nn.Module):
 
                 localTime = time.time()
 
-                print(f'size of bx is : {bX.size()}')
-                print(f'size of bz is : {bZ.size()}')
-
                 TotalLoss = torch.zeros(1)
                 hidden = self.init_hidden_cell(batchSize=bX.size(0))
                 cell = self.init_hidden_cell(batchSize=bX.size(0))
@@ -197,7 +197,7 @@ class DeepARPredictor(nn.Module):
                 for t in range(self.windowRangeTrn):
                     if t == 0:
                         Z0 = torch.zeros(bX.size(0),1)
-                        print(f'Z0 size is : {Z0.size()} and bXsize is : {bX[:,t,:].size()}')
+
 
                         bInput = torch.unsqueeze(torch.cat((bX[:,t,:],Z0),dim=1),dim=1)
                     else:
@@ -277,100 +277,121 @@ class DeepARPredictor(nn.Module):
         torch.set_grad_enabled(True)
         self.DeepArModel.train()
 
-    def TestStep(self):
+    def TestStep(self,timeStamp=1514768940):
 
         self.DeepArModel.eval()
         self.optimizer.zero_grad()
 
         ResultLst = []
+        predLst = []
+        labelLst = []
+        lowerBoundLst = []
+        upperBoundLst = []
 
         with torch.set_grad_enabled(False):
-            for idx,(bXTst,bZTst) in enumerate(self.testDataloader):
 
-                if idx >= 1:
-                    break
-
-                print(f'yes is : {bZTst.size()}')
-
-                TotalLoss = torch.zeros(1)
-                hidden = self.init_hidden_cell(batchSize=bXTst.size(0))
-                cell = self.init_hidden_cell(batchSize=bXTst.size(0))
-
-                bZTst = bZTst.float()
-
-                for t in range(self.windowRangeTst):
-                    if t == 0:
-                        Z0Tst = torch.zeros(bXTst.size(0),1)
-                        bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], Z0Tst), dim=1),dim=1)
-                    else:
-                        bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], bZTst[:, t - 1, :]), dim=1),dim=1)
-
-                    mu, sig, hidden, cell = self.forward(bInputTst, hidden=hidden, cell=cell)
-
-                    mu = mu.to('cpu')
-                    sig = sig.to('cpu')
-                    hidden = hidden.to('cpu')
-                    cell = cell.to('cpu')
-
-                    bzTst_copy = bZTst[:, t, :].clone().detach().to('cpu')
-                    mu_copy = mu.clone().detach().to('cpu')
-                    sig_copy = sig.clone().detach().to('cpu')
-
-                    ResultLst.append([bzTst_copy, bzTst_copy, mu_copy, sig_copy])
+            bXTst,bZTst = self.MyTestDataset.getItem(timeStamp=timeStamp)
 
 
+
+            samples = torch.zeros(1,self.sampleNum,self.seqLen - self.windowRangeTst)
+
+            TotalLoss = torch.zeros(1)
+            hidden = self.init_hidden_cell(batchSize=bXTst.size(0))
+            cell = self.init_hidden_cell(batchSize=bXTst.size(0))
+
+            bZTst = bZTst.float()
+            bXTst = bXTst.float()
+
+            for t in range(self.windowRangeTst):
+                if t == 0:
+                    Z0Tst = torch.zeros(bXTst.size(0),1)
+                    bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], Z0Tst), dim=1),dim=1)
+                else:
+                    bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], bZTst[:, t - 1, :]), dim=1),dim=1)
+
+                mu, sig, hidden, cell = self.forward(bInputTst, hidden=hidden, cell=cell)
+
+                mu = mu.to('cpu')
+                sig = sig.to('cpu')
+                hidden = hidden.to('cpu')
+                cell = cell.to('cpu')
+
+                bzTst_copy = bZTst[:, t, :].clone().detach().to('cpu')
+                mu_copy = mu.clone().detach().to('cpu')
+                sig_copy = sig.clone().detach().to('cpu')
+
+
+                predLst.append(bzTst_copy)
+                labelLst.append(bzTst_copy)
+                lowerBoundLst.append(mu_copy-self.sigmaNum*sig_copy)
+                upperBoundLst.append(mu_copy+self.sigmaNum*sig_copy)
+
+
+            for samplestep in range(self.sampleNum):
+
+                hidden4sample = hidden
+                cell4sample = cell
 
                 for t in range(self.windowRangeTst,self.seqLen):
                     if t == self.windowRangeTst:
                         bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], bZTst[:, t - 1, :]), dim=1),dim=1)
 
-                        mu, sig, hidden, cell = self.forward(bInputTst, hidden=hidden, cell=cell)
+                        mu, sig, hidden4sample, cell4sample = self.forward(bInputTst,
+                                                                           hidden=hidden4sample,
+                                                                           cell=cell4sample)
 
                         gaussian = torch.distributions.normal.Normal(mu,sig)
                         z_pred = gaussian.sample()
                         z_pred = z_pred.to('cpu')
 
                         z_pred_copy = z_pred.clone().detach().to('cpu')
+                        samples[0,samplestep,t-self.windowRangeTst] = z_pred_copy
+
                         bzTst_copy = bZTst[:,t,:].clone().detach().to('cpu')
+                        if samplestep == 0:
+                            labelLst.append(bzTst_copy)
+
                         mu_copy = mu.clone().detach().to('cpu')
                         sig_copy = sig.clone().detach().to('cpu')
 
-                        ResultLst.append([z_pred_copy,bzTst_copy,mu_copy,sig_copy])
                     else:
 
-                        bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], torch.unsqueeze(z_pred,dim=1)), dim=1),dim=1)
-                        mu, sig, hidden, cell = self.forward(bInputTst, hidden=hidden, cell=cell)
+                        bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :],
+                                                               torch.unsqueeze(torch.unsqueeze(z_pred,dim=0),dim=1))
+                                                              , dim=1),dim=1)
+                        mu, sig, hidden4sample, cell4sample = self.forward(bInputTst,
+                                                                           hidden=hidden4sample,
+                                                                           cell=cell4sample)
                         gaussian = torch.distributions.normal.Normal(mu, sig)
                         z_pred = gaussian.sample()
                         z_pred = z_pred.to('cpu')
 
                         z_pred_copy = z_pred.clone().detach().to('cpu')
+                        samples[0, samplestep, t - self.windowRangeTst] = z_pred_copy
+
                         bzTst_copy = bZTst[:, t, :].clone().detach().to('cpu')
+                        if samplestep == 0:
+                            labelLst.append(bzTst_copy)
+
                         mu_copy = mu.clone().detach().to('cpu')
                         sig_copy = sig.clone().detach().to('cpu')
 
-                        ResultLst.append([z_pred_copy, bzTst_copy, mu_copy, sig_copy])
+            sample_mu = torch.mean(samples,dim=1).squeeze()
+            sample_sig = samples.std(dim=1).squeeze()
+
+            for i in range(len(sample_mu)):
+                predLst.append(sample_mu[i])
+                lowerBoundLst.append(sample_mu[i] - self.sigmaNum * sample_sig[i])
+                upperBoundLst.append(sample_mu[i] + self.sigmaNum * sample_sig[i])
 
 
-            for each in range(len(ResultLst[0][0])):
-                predLst = []
-                labelLst = []
-                lowerBoundLst = []
-                upperBoundLst = []
-
-                for i in ResultLst:
-                    predLst.append(i[0][each])
-                    labelLst.append(i[1][each])
-                    lowerBoundLst.append(i[2][each]-self.sigmaNum*i[3][each])
-                    upperBoundLst.append(i[2][each] + self.sigmaNum * i[3][each])
-
-
-                plt.plot(range(len(predLst)),predLst,'r')
-                plt.plot(range(len(labelLst)), labelLst,'b')
-                plt.fill_between(range(len(predLst)),lowerBoundLst,upperBoundLst,color='g',alpha=.1)
-                plt.savefig(self.modelPlotSaveDir+'TestResult_'+str(each)+'.png',dpi=200)
-                plt.show()
-                plt.close()
+            plt.plot(range(len(predLst)),predLst,'r')
+            plt.plot(range(len(labelLst)), labelLst,'b')
+            plt.fill_between(range(len(predLst)),lowerBoundLst,upperBoundLst,color='g',alpha=.1)
+            plt.savefig(self.modelPlotSaveDir+'TestResult_'+str(timeStamp)+'.png',dpi=200)
+            plt.show()
+            plt.close()
 
         torch.set_grad_enabled(True)
         self.DeepArModel.train()

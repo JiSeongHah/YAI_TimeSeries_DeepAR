@@ -32,28 +32,29 @@ if __name__ == '__main__':
     iter_to_accumul = 1
     inputSize = 5
     hiddenSize = 128
-    numLayer = 3
+    numLayer = 4
     muLin1 = 128
     muLin2= 128
     sigLin1 = 128
     sigLin2 = 128
-    seqLen = 128+15
+    windowRangeTst = 32
+    seqLen = windowRangeTst+15
     windowRangeTrn = 1
     windowRangeVal = 1
-    windowRangeTst = 128
-    sigmaNum = 2
-    bSizeTrn = 3
-    bSizeVal = 3
-    bSizeTst = 4
+    sigmaNum = 0.1
+    bSizeTrn = 2048
+    bSizeVal = 2048
+    bSizeTst = 100
     MaxStepTrn = 128
     MaxStepVal =128
+    sampleNum = 1024
 
-    modelLoadNum = 1
+    modelLoadNum = 2300
     save_range= 100
-    MaxEpoch = 10000
+    MaxEpoch = 100000
     gpuUse= True
 
-    savingDir = mk_name(mu1=muLin1,mu2=muLin2,sig1=sigLin1,sig2=sigLin2,wdw=windowRangeTst,signum=2,bs=64)
+    savingDir = mk_name(model='NOLSTMRELU',mu1=muLin1,mu2=muLin2,sig1=sigLin1,sig2=sigLin2,wdw=windowRangeTst,signum=sigmaNum,bs=bSizeTrn)
     modelPlotSaveDir = baseDir +'Results/'+savingDir + '/'
     createDirectory(modelPlotSaveDir)
     createDirectory(modelPlotSaveDir+'models')
@@ -87,11 +88,10 @@ if __name__ == '__main__':
             bSizeVal= bSizeVal,
             bSizeTst= bSizeTst,
             gpuUse= gpuUse,
+            sampleNum=sampleNum
         )
 
-
-
-    # MODEL_START.TestStep()
+    #MODEL_START.TestStep()
 
     for i in range(10000):
         MODEL_START.START_TRN_VAL(epoch=i,MaxEpoch=MaxEpoch)
@@ -131,4 +131,4 @@ if __name__ == '__main__':
 
 
 
-
+    #

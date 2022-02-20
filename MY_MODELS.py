@@ -83,14 +83,21 @@ class MyDeepAR(torch.nn.Module):
 
         lstmOut, (hidden,cell) = self.lstm(x,(hidden,cell))
 
+        # lstmOut = F.leaky_relu(lstmOut)
+        # hidden = F.leaky_relu(hidden)
+        # cell = F.leaky_relu(cell)
 
-        muOut = self.mu1(lstmOut)
-        muOut = self.mu2(muOut)
+        lstmOut = lstmOut
+        hidden = hidden
+        cell = cell
+
+        muOut = F.leaky_relu(self.mu1(lstmOut))
+        muOut = F.leaky_relu(self.mu2(muOut))
         muOut = self.mu3(muOut)
 
 
-        sigOut = self.sig1(lstmOut)
-        sigOut = self.sig2(sigOut)
+        sigOut = F.leaky_relu(self.sig1(lstmOut))
+        sigOut = F.leaky_relu(self.sig2(sigOut))
         sigOut = self.sig3(sigOut)
         sigOut = self.distribution_sigma(sigOut)
 

@@ -219,12 +219,11 @@ import torch
 import torch.nn as nn
 
 
-rnn = nn.LSTM(input_size=3,hidden_size=7,num_layers=9,batch_first=True)
+x = torch.zeros(1,3,5)
 
-input = torch.randn(111,1424,3)
-h0 = torch.randn(9,111,7)
-c0 = torch.randn(9,111,7)
+mu = torch.mean(x,dim=1).squeeze()
+sig = x.std(dim=1)
 
-output, (hn,cn) = rnn(input,(h0,c0))
-
-print(output.size(), hn.size())
+print(mu.size())
+print('-0-00000000000000')
+print(sig.size())
