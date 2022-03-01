@@ -20,7 +20,7 @@ from DEEPARPREDICTOR import DeepARPredictor
 if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
-    baseDir = '/home/a286/hjs_dir1/g-research-crypto-forecasting/dataset/'
+    baseDir = '/home/a286/hjs_dir1/g-research-crypto-forecasting/dataset2/'
 
     data_folder_dir_trn = baseDir + 'train/'
     data_folder_dir_val  = baseDir + 'val/'
@@ -29,12 +29,12 @@ if __name__ == '__main__':
     coin = 'Bitcoin'
 
     iter_to_accumul = 1
-    hiddenSizeLst = [128,256,512]
-    numLayerLst = [4,8]
-    linNumLst = [32,64,128]
+    hiddenSizeLst = [128,256]
+    numLayerLst = [2,4]
+    linNumLst = [64,128]
 
-    windowRangeTstLst = [16,32,64,128,256]
-    XrangeNumLst = [9,10,11,12]
+    windowRangeTstLst = [32,64,128,256]
+    XrangeNumLst = [5,6]
 
 
 
@@ -62,7 +62,7 @@ if __name__ == '__main__':
                         XtMethod = 'real'
 
                         modelLoadNum = 600
-                        save_range = 10
+                        save_range = 5
                         MaxEpoch = 100000
                         gpuUse = True
                         inputSize = XrangeNum*5 + 5
@@ -100,6 +100,7 @@ if __name__ == '__main__':
                                 bSizeTrn= bSizeTrn,
                                 bSizeVal= bSizeVal,
                                 bSizeTst= bSizeTst,
+                                XrangeNum=XrangeNum,
                                 gpuUse= gpuUse,
                                 sampleNum=sampleNum,
                                 XtMethod=XtMethod
@@ -107,7 +108,7 @@ if __name__ == '__main__':
 
                         #MODEL_START.TestStep(timeStamp=1624846200+60*90000)
 
-                        for i in range(100):
+                        for i in range(20):
                             MODEL_START.START_TRN_VAL(epoch=i,MaxEpoch=MaxEpoch)
 
                             if i%save_range ==0:

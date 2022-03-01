@@ -29,12 +29,12 @@ if __name__ == '__main__':
     coin = 'Bitcoin'
 
     iter_to_accumul = 1
-    hiddenSizeLst = [128,256,512]
+    hiddenSizeLst = [64,128,256]
     numLayerLst = [4,8]
     linNumLst = [32,64,128]
 
     windowRangeTstLst = [16,32,64,128,256]
-    XrangeNumLst = [3,4]
+    XrangeNumLst = [1,2]
 
 
 
@@ -62,7 +62,7 @@ if __name__ == '__main__':
                         XtMethod = 'real'
 
                         modelLoadNum = 600
-                        save_range = 10
+                        save_range = 5
                         MaxEpoch = 100000
                         gpuUse = True
                         inputSize = XrangeNum*5 + 5
@@ -106,9 +106,9 @@ if __name__ == '__main__':
                                 XtMethod=XtMethod
                             )
 
-                        MODEL_START.TestStep(timeStamp=1624846200+60*90000)
+                        #MODEL_START.TestStep(timeStamp=1624846200+60*90000)
 
-                        for i in range(100):
+                        for i in range(20):
                             MODEL_START.START_TRN_VAL(epoch=i,MaxEpoch=MaxEpoch)
 
                             if i%save_range ==0:
