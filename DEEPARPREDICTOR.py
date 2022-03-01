@@ -43,7 +43,9 @@ class DeepARPredictor(nn.Module):
                  MaxStepTrn,
                  MaxStepVal,
                  gpuUse,
+                 XrangeNum,
                  sampleNum,
+                 XtMethod,
                  sigmaNum=3,
                  bSizeTrn= 8,
                  bSizeVal=1,
@@ -64,6 +66,8 @@ class DeepARPredictor(nn.Module):
         self.coin = coin
         self.gpuUse = gpuUse
 
+        self.XtMethod = XtMethod
+
         self.inputSize = inputSize
         self.hiddenSize = hiddenSize
         self.numLayer=  numLayer
@@ -77,6 +81,7 @@ class DeepARPredictor(nn.Module):
         self.windowRangeTrn = windowRangeTrn
         self.windowRangeVal = windowRangeVal
         self.windowRangeTst = windowRangeTst
+        self.XrangeNum = XrangeNum
 
         self.MaxStepTrn = MaxStepTrn
         self.MaxStepVal = MaxStepVal
@@ -130,14 +135,18 @@ class DeepARPredictor(nn.Module):
         MyTrnDataset = DeepARDataset(
             seqLen=self.seqLen,
             baseDir=self.data_folder_dir_trn,
-            coin=self.coin
+            coin=self.coin,
+            XtMethod=XtMethod,
+            XrangeNum=self.XrangeNum
         )
         self.trainDataloader = DataLoader(MyTrnDataset,batch_size=self.bSizeTrn,shuffle=True)
 
         MyValDataset = DeepARDataset(
             seqLen=self.seqLen,
             baseDir=self.data_folder_dir_val,
-            coin=self.coin
+            coin=self.coin,
+            XtMethod=XtMethod,
+            XrangeNum=self.XrangeNum
         )
         self.valDataloader = DataLoader(MyValDataset, batch_size=self.bSizeVal, shuffle=False)
 
@@ -145,7 +154,9 @@ class DeepARPredictor(nn.Module):
             seqLen=self.seqLen,
             baseDir=self.data_folder_dir_test,
             coin=self.coin,
-            windowRangeTst=windowRangeTst
+            XtMethod=XtMethod,
+            windowRangeTst=windowRangeTst,
+            XrangeNum=self.XrangeNum
         )
 
         self.DeepArModel.to(device=self.device)
@@ -165,7 +176,9 @@ class DeepARPredictor(nn.Module):
     def calLoss(self,mu,sig,label):
         #print(mu,sig,label)
         distribution = torch.distributions.normal.Normal(mu, sig)
-        likelihood = distribution.log_prob(label)
+        likelihood = (distribution.log_prob(label))
+
+        #likelihood = torch.exp(likelihood)
 
         #print(-torch.mean(likelihood))
 
@@ -184,6 +197,7 @@ class DeepARPredictor(nn.Module):
         with torch.set_grad_enabled(True):
             globalTime= time.time()
 
+
             for idx,(bX,bZ) in enumerate(self.trainDataloader):
 
                 localTime = time.time()
@@ -197,19 +211,21 @@ class DeepARPredictor(nn.Module):
 
                 for t in range(self.windowRangeTrn):
                     if t == 0:
-                        Z0 = torch.zeros(bX.size(0),1)
+                        Z0 = torch.zeros(bX.size(0),5)
 
                         bInput = torch.unsqueeze(torch.cat((bX[:,t,:],Z0),dim=1),dim=1)
                     else:
                         bInput = torch.unsqueeze(torch.cat((bX[:, t, :], bZ[:, t - 1, :]), dim=1),dim=1)
 
                     mu,sig,hidden,cell = self.forward(bInput,hidden=hidden,cell=cell)
+
                     mu = mu.to('cpu')
                     sig = sig.to('cpu')
                     hidden = hidden.to('cpu')
                     cell = cell.to('cpu')
                     ResultLoss = self.calLoss(mu=mu,sig=sig,label=bZ[:,t,:])
-                    print(f'mu : {mu[0]} , label : {bZ[0, t, :].item()}, diff : {abs(mu[0] - bZ[0, t, :].item())}')
+                    print(f'mu : {mu[0,3].item()} , label : {bZ[0, t, :][3].item()},'
+                          f' diff : {abs(mu[0,3].item() - bZ[0, t, :][3].item())}')
 
                     TotalLoss += ResultLoss
 
@@ -219,7 +235,8 @@ class DeepARPredictor(nn.Module):
                     localTimeElaps = round(time.time() - localTime, 2)
                     globalTimeElaps = round(time.time() - globalTime, 2)
                     print(
-                        f'globaly {globalTimeElaps} elapsed and locally {localTimeElaps} elapsed for {idx} / {self.MaxStepTrn}'
+                        f'globaly {globalTimeElaps} elapsed and locally {localTimeElaps} '
+                        f'elapsed for {idx} / {self.MaxStepTrn}'
                         f' of epoch : {trainingNum}/{len(self.trainDataloader)}'
                         f' with loss : {TotalLoss.item()}')
                     self.optimizer.step()
@@ -250,7 +267,7 @@ class DeepARPredictor(nn.Module):
 
                 for t in range(self.windowRangeVal):
                     if t == 0:
-                        Z0Val = torch.zeros(bXVal.size(0),1)
+                        Z0Val = torch.zeros(bXVal.size(0),5)
                         bInputVal = torch.unsqueeze(torch.cat((bXVal[:, t, :], Z0Val), dim=1),dim=1)
                     else:
                         bInputVal = torch.unsqueeze(torch.cat((bXVal[:, t, :], bZVal[:, t - 1, :]), dim=1),dim=1)
@@ -261,7 +278,8 @@ class DeepARPredictor(nn.Module):
                     hidden = hidden.to('cpu')
                     cell = cell.to('cpu')
 
-                    print(f'mu : {mu[0]} , label : {bZVal[0, t, :].item()}, diff : {abs(mu[0] - bZVal[0, t, :].item())}')
+                    print(f'mu : {mu[0,3].item()} , label : {bZVal[0, t, :][3].item()},'
+                          f' diff : {abs(mu[0,3].item() - bZVal[0, t, :][3].item())}')
 
                     ResultLoss = self.calLoss(mu=mu,sig=sig,label=bZVal[:,t,:])
                     TotalLoss += ResultLoss
@@ -279,6 +297,16 @@ class DeepARPredictor(nn.Module):
 
         torch.set_grad_enabled(True)
         self.DeepArModel.train()
+
+    def SupEndValue(self,zPred):
+
+        if zPred[3] > zPred[1]:
+            zPred[3] = zPred[1]
+
+        elif zPred[3] < zPred[2]:
+            zPred[3] = zPred[2]
+
+        return zPred
 
     def TestStep(self,timeStamp=1514768940):
 
@@ -306,7 +334,7 @@ class DeepARPredictor(nn.Module):
 
             for t in range(self.windowRangeTst):
                 if t == 0:
-                    Z0Tst = torch.zeros(bXTst.size(0),1)
+                    Z0Tst = torch.zeros(bXTst.size(0),5)
                     bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], Z0Tst), dim=1),dim=1)
                 else:
                     bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :], bZTst[:, t - 1, :]), dim=1),dim=1)
@@ -321,13 +349,15 @@ class DeepARPredictor(nn.Module):
                 bzTst_copy = bZTst[:, t, :].clone().detach().to('cpu')
                 mu_copy = mu.clone().detach().to('cpu')
                 sig_copy = sig.clone().detach().to('cpu')
-                print(f'mu : {mu} and label : {bzTst_copy.item()} diff : {abs(mu - bzTst_copy.item())}')
+                # print(f'mu is : {mu} and bzTst is {bzTst_copy}')
+                print(f'mu : {mu[3].item()} and label : {bzTst_copy[0,3].item()}'
+                      f' diff : {abs(mu[3].item() - bzTst_copy[0,3].item())}')
 
 
-                predLst.append(bzTst_copy)
-                labelLst.append(bzTst_copy)
-                lowerBoundLst.append(mu_copy-self.sigmaNum*sig_copy)
-                upperBoundLst.append(mu_copy+self.sigmaNum*sig_copy)
+                predLst.append(bzTst_copy[0,3])
+                labelLst.append(bzTst_copy[0,3])
+                lowerBoundLst.append(mu_copy[3]-self.sigmaNum*sig_copy[3])
+                upperBoundLst.append(mu_copy[3]+self.sigmaNum*sig_copy[3])
 
 
             for samplestep in range(self.sampleNum):
@@ -346,24 +376,26 @@ class DeepARPredictor(nn.Module):
                         gaussian = torch.distributions.normal.Normal(mu,sig)
                         z_pred = gaussian.sample()
                         z_pred = z_pred.to('cpu')
+                        z_pred = self.SupEndValue(z_pred)
 
                         z_pred_copy = z_pred.clone().detach().to('cpu')
 
-                        samples[0,samplestep,t-self.windowRangeTst] = z_pred_copy
+                        samples[0,samplestep,t-self.windowRangeTst] = z_pred_copy[3]
 
                         bzTst_copy = bZTst[:,t,:].clone().detach().to('cpu')
 
                         if samplestep == 0:
-                            labelLst.append(bzTst_copy)
+                            labelLst.append(bzTst_copy[0,3])
 
-                        print(f'z_pred : {z_pred} and label : {bzTst_copy.item()} diff : {abs(z_pred-bzTst_copy.item())}')
+                        print(f'z_pred : {z_pred[3].item()} and label : {bzTst_copy[0,3].item()}'
+                              f' diff : {abs(z_pred[3].item()-bzTst_copy[0,3].item())}')
                         mu_copy = mu.clone().detach().to('cpu')
                         sig_copy = sig.clone().detach().to('cpu')
 
                     else:
 
                         bInputTst = torch.unsqueeze(torch.cat((bXTst[:, t, :],
-                                                               torch.unsqueeze(torch.unsqueeze(z_pred,dim=0),dim=1))
+                                                               torch.unsqueeze(z_pred,dim=0))
                                                               , dim=1),dim=1)
                         mu, sig, hidden4sample, cell4sample = self.forward(bInputTst,
                                                                            hidden=hidden4sample,
@@ -371,14 +403,16 @@ class DeepARPredictor(nn.Module):
                         gaussian = torch.distributions.normal.Normal(mu, sig)
                         z_pred = gaussian.sample()
                         z_pred = z_pred.to('cpu')
+                        z_pred = self.SupEndValue(z_pred)
 
                         z_pred_copy = z_pred.clone().detach().to('cpu')
-                        samples[0, samplestep, t - self.windowRangeTst] = z_pred_copy
+                        samples[0, samplestep, t - self.windowRangeTst] = z_pred_copy[3]
 
                         bzTst_copy = bZTst[:, t, :].clone().detach().to('cpu')
                         if samplestep == 0:
-                            labelLst.append(bzTst_copy)
-                        print(f'z_pred : {z_pred} and label : {bzTst_copy.item()} diff : {abs(z_pred-bzTst_copy.item())}')
+                            labelLst.append(bzTst_copy[0,3])
+                        print(f'z_pred : {z_pred[3].item()} and label : {bzTst_copy[0,3].item()}'
+                              f' diff : {abs(z_pred[3].item()-bzTst_copy[0,3].item())}')
                         mu_copy = mu.clone().detach().to('cpu')
                         sig_copy = sig.clone().detach().to('cpu')
 

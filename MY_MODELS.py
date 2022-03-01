@@ -70,11 +70,11 @@ class MyDeepAR(torch.nn.Module):
 
         self.mu1 = nn.Linear(in_features=self.hiddenSize,out_features=self.muLin1)
         self.mu2 = nn.Linear(in_features=self.muLin1, out_features=self.muLin2)
-        self.mu3 = nn.Linear(in_features=self.muLin2,out_features=1)
+        self.mu3 = nn.Linear(in_features=self.muLin2,out_features=5)
 
         self.sig1 = nn.Linear(in_features=self.hiddenSize, out_features=self.sigLin1)
         self.sig2 = nn.Linear(in_features=self.sigLin1, out_features=self.sigLin2)
-        self.sig3 = nn.Linear(in_features=self.sigLin2, out_features=1)
+        self.sig3 = nn.Linear(in_features=self.sigLin2, out_features=5)
         self.distribution_sigma = nn.Softplus()
 
 
@@ -93,11 +93,15 @@ class MyDeepAR(torch.nn.Module):
 
         muOut = F.leaky_relu(self.mu1(lstmOut))
         muOut = F.leaky_relu(self.mu2(muOut))
+        # muOut = self.mu1(lstmOut)
+        # muOut = self.mu2(muOut)
         muOut = self.mu3(muOut)
 
 
         sigOut = F.leaky_relu(self.sig1(lstmOut))
         sigOut = F.leaky_relu(self.sig2(sigOut))
+        # sigOut = self.sig1(lstmOut)
+        # sigOut = self.sig2(sigOut)
         sigOut = self.sig3(sigOut)
         sigOut = self.distribution_sigma(sigOut)
 

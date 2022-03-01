@@ -18,9 +18,9 @@ from MY_MODELS import MyDeepAR
 from DEEPARPREDICTOR import DeepARPredictor
 
 if __name__ == '__main__':
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-    baseDir = '/home/a286winteriscoming/Downloads/g-research-crypto-forecasting/dataset/'
+    baseDir = '/home/a286/hjs_dir1/g-research-crypto-forecasting/dataset/'
 
     data_folder_dir_trn = baseDir + 'train/'
     data_folder_dir_val  = baseDir + 'val/'
@@ -34,7 +34,7 @@ if __name__ == '__main__':
     linNumLst = [32,64,128]
 
     windowRangeTstLst = [16,32,64,128,256]
-    XrangeNumLst = [3,4]
+    XrangeNumLst = [5,6,7,8]
 
 
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
                         gpuUse = True
                         inputSize = XrangeNum*5 + 5
 
-                        savingDir = mk_name(dir1='/',model='minusverTOTALRELU',XrangeNum=XrangeNum,hidden=hiddenSize,nlayer=numLayer,linNum=linNum,wdw=windowRangeTst,signum=sigmaNum,bs=bSizeTrn)
+                        savingDir = mk_name(dir2='/',model='divVerRELU',XrangeNum=XrangeNum,hidden=hiddenSize,nlayer=numLayer,linNum=linNum,wdw=windowRangeTst,signum=sigmaNum,bs=bSizeTrn)
                         modelPlotSaveDir = baseDir +'Results/'+savingDir + '/'
                         createDirectory(modelPlotSaveDir)
                         createDirectory(modelPlotSaveDir+'models')
@@ -100,13 +100,12 @@ if __name__ == '__main__':
                                 bSizeTrn= bSizeTrn,
                                 bSizeVal= bSizeVal,
                                 bSizeTst= bSizeTst,
-                                XrangeNum=XrangeNum,
                                 gpuUse= gpuUse,
                                 sampleNum=sampleNum,
                                 XtMethod=XtMethod
                             )
 
-                        MODEL_START.TestStep(timeStamp=1624846200+60*90000)
+                        #MODEL_START.TestStep(timeStamp=1624846200+60*90000)
 
                         for i in range(100):
                             MODEL_START.START_TRN_VAL(epoch=i,MaxEpoch=MaxEpoch)
