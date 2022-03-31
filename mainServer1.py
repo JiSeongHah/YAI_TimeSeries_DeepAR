@@ -34,7 +34,7 @@ if __name__ == '__main__':
     linNumLst = [128]
 
     windowRangeTstLst = [32,64,128,256]
-    XrangeNumLst = [1,2]
+    XrangeNumLst = [1,2,3,4]
 
 
 
@@ -61,7 +61,7 @@ if __name__ == '__main__':
                         sampleNum = 1024
                         XtMethod = 'real'
 
-                        modelLoadNum = 600
+                        modelLoadNum = 15
                         save_range = 5
                         MaxEpoch = 100
                         gpuUse = True
@@ -106,20 +106,20 @@ if __name__ == '__main__':
                                 XtMethod=XtMethod
                             )
 
-                        #MODEL_START.TestStep(timeStamp=1624846200+60*90000)
+                        MODEL_START.TestStep(timeStamp=1624846200+60*90000)
 
-                        for i in range(20):
-                            MODEL_START.START_TRN_VAL(epoch=i,MaxEpoch=MaxEpoch)
-
-                            if i%save_range ==0:
-                                if i > MaxEpoch:
-                                    break
-
-                                try:
-                                    torch.save(MODEL_START, modelPlotSaveDir+'models/' + str(i) + '.pth')
-                                    print('saving model complete')
-                                    time.sleep(5)
-                                except:
-                                    print('saving model failed')
-                                    time.sleep(5)
-
+                        # for i in range(20):
+                        #     MODEL_START.START_TRN_VAL(epoch=i,MaxEpoch=MaxEpoch)
+                        #
+                        #     if i%save_range ==0:
+                        #         if i > MaxEpoch:
+                        #             break
+                        #
+                        #         try:
+                        #             torch.save(MODEL_START, modelPlotSaveDir+'models/' + str(i) + '.pth')
+                        #             print('saving model complete')
+                        #             time.sleep(5)
+                        #         except:
+                        #             print('saving model failed')
+                        #             time.sleep(5)
+                        #

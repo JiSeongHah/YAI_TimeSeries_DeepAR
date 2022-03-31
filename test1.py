@@ -65,85 +65,85 @@ import numpy as np
 #         print(f'{idx}/{len(lst)} th append done')
 
 
-def makeinterpolation(prevLst,postLst,ratio,plusNum):
-
-    prevArr = np.array(prevLst,dtype=np.float32)[1:]
-    postArr = np.array(postLst,dtype=np.float32)[1:]
-
-    Result = prevArr * (1-ratio) +postArr * ratio
-
-    ResultLst = Result.tolist()
-    ResultLst.insert(0,int(prevLst[0])+plusNum)
-
-    print(f'prev is : {prevLst[0]} and pose : {postLst[0]} so Result i'
-          f's : {ResultLst[0]} post-prev is : {int(postLst[0])-int(prevLst[0])}'
-          f'and new - prev is : {ResultLst[0]-int(prevLst[0])}'
-          f'while plusNum is : {plusNum}')
-
-    return ResultLst
-
-
-coinLst = [
-    'BitcoinCash.csv',
-    'BinanceCoin.csv',
-    'Bitcoin.csv',
-    'EOS.csv',
-    'ETHClassic.csv',
-    'ETH.csv',
-    'Litecoin.csv',
-    'Monero.csv',
-    'TRON.csv',
-    'Stellar.csv',
-    'Cardano.csv',
-    'IOTA.csv',
-    'Maker.csv',
-    'Doge.csv'
-]
-
-
-def CHANGECSV2ADDINTERPOLATION(csvFile):
-
-    saveDir = '/home/a286winteriscoming/Downloads/g-research-crypto-forecasting/dataset/val/'
-
-    newLst = []
-
-    with open(saveDir+csvFile,'r') as f:
-        rdr = csv.reader(f)
-        lst = list(rdr)
-
-        for idx,line in enumerate(lst):
-
-            if idx < 1:
-                newLst.append(line[:-2])
-            elif idx >=1 and idx <= len(lst)-2:
-                newLst.append(line[:-2])
-
-                timeStamp = float( line[0] )
-                nextStamp = float( lst[idx+1][0])
-
-                if nextStamp - timeStamp > 60:
-                    print(f'{idx} th line is missing next data because {nextStamp} and {timeStamp} diff is : {nextStamp-timeStamp}')
-                    diff = int(int(nextStamp - timeStamp)/60) -1
-                    #diff = int(nextStamp) - int(timeStamp)
-
-                    #if diff% 60 != 0:
-                    #    print(f'here is problem, {line[0]} with {lst[idx+1][0]} and {diff}')
-                    for middle in range(diff):
-                        middlePoint = makeinterpolation(prevLst=line[:-2],postLst=lst[idx+1][:-2],ratio=(middle+1)/(diff+1),plusNum=(middle+1)*60 )
-                        newLst.append(middlePoint)
-            else:
-                newLst.append(line[:-2])
-
-    with open(saveDir + 'new'+csvFile,'w',newline='') as f:
-        wr = csv.writer(f)
-        wr.writerows(newLst)
-
-    print(f'{csvFile} complete')
-
-
-for coin in coinLst:
-    CHANGECSV2ADDINTERPOLATION(coin)
-
+# def makeinterpolation(prevLst,postLst,ratio,plusNum):
+#
+#     prevArr = np.array(prevLst,dtype=np.float32)[1:]
+#     postArr = np.array(postLst,dtype=np.float32)[1:]
+#
+#     Result = prevArr * (1-ratio) +postArr * ratio
+#
+#     ResultLst = Result.tolist()
+#     ResultLst.insert(0,int(prevLst[0])+plusNum)
+#
+#     print(f'prev is : {prevLst[0]} and pose : {postLst[0]} so Result i'
+#           f's : {ResultLst[0]} post-prev is : {int(postLst[0])-int(prevLst[0])}'
+#           f'and new - prev is : {ResultLst[0]-int(prevLst[0])}'
+#           f'while plusNum is : {plusNum}')
+#
+#     return ResultLst
+#
+#
+# coinLst = [
+#     'BitcoinCash.csv',
+#     'BinanceCoin.csv',
+#     'Bitcoin.csv',
+#     'EOS.csv',
+#     'ETHClassic.csv',
+#     'ETH.csv',
+#     'Litecoin.csv',
+#     'Monero.csv',
+#     'TRON.csv',
+#     'Stellar.csv',
+#     'Cardano.csv',
+#     'IOTA.csv',
+#     'Maker.csv',
+#     'Doge.csv'
+# ]
+#
+#
+# def CHANGECSV2ADDINTERPOLATION(csvFile):
+#
+#     saveDir = '/home/a286winteriscoming/Downloads/g-research-crypto-forecasting/dataset/val/'
+#
+#     newLst = []
+#
+#     with open(saveDir+csvFile,'r') as f:
+#         rdr = csv.reader(f)
+#         lst = list(rdr)
+#
+#         for idx,line in enumerate(lst):
+#
+#             if idx < 1:
+#                 newLst.append(line[:-2])
+#             elif idx >=1 and idx <= len(lst)-2:
+#                 newLst.append(line[:-2])
+#
+#                 timeStamp = float( line[0] )
+#                 nextStamp = float( lst[idx+1][0])
+#
+#                 if nextStamp - timeStamp > 60:
+#                     print(f'{idx} th line is missing next data because {nextStamp} and {timeStamp} diff is : {nextStamp-timeStamp}')
+#                     diff = int(int(nextStamp - timeStamp)/60) -1
+#                     #diff = int(nextStamp) - int(timeStamp)
+#
+#                     #if diff% 60 != 0:
+#                     #    print(f'here is problem, {line[0]} with {lst[idx+1][0]} and {diff}')
+#                     for middle in range(diff):
+#                         middlePoint = makeinterpolation(prevLst=line[:-2],postLst=lst[idx+1][:-2],ratio=(middle+1)/(diff+1),plusNum=(middle+1)*60 )
+#                         newLst.append(middlePoint)
+#             else:
+#                 newLst.append(line[:-2])
+#
+#     with open(saveDir + 'new'+csvFile,'w',newline='') as f:
+#         wr = csv.writer(f)
+#         wr.writerows(newLst)
+#
+#     print(f'{csvFile} complete')
+#
+#
+# for coin in coinLst:
+#     CHANGECSV2ADDINTERPOLATION(coin)
+#
 
 
 
@@ -274,7 +274,15 @@ import numpy as np
 from datetime import datetime
 import time
 
+ut = 1514764860
+dt = datetime.fromtimestamp(ut).strftime('%Y-%m-%d %H:%M:%S')
+print(dt)
 
+
+x = torch.tensor([1,2,3,4])
+y= x>2
+yy = x>3
+print(y+yy)
 # baseDir = '/home/a286winteriscoming/Downloads/g-research-crypto-forecasting/'
 #
 # with open(baseDir+'train.csv','r') as f:

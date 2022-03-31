@@ -112,3 +112,62 @@ class MyDeepAR(torch.nn.Module):
 
 
 
+class MyvanillaLSTM(torch.nn.Module):
+
+    def __init__(self,inputSize,
+                 hiddenSize,
+                 numLayer,
+                 seqLen,
+                 linNum1,
+                 linNum2,
+                 dropRatio=0,
+                 rnnBase='lstm',
+                 lastOrAll='last'):
+        super(MyvanillaLSTM, self).__init__()
+
+        self.inputSize = inputSize
+        self.hiddenSize = hiddenSize
+        self.numLayer =  numLayer
+        self.rnnBase = rnnBase
+
+        self.linNum1 = linNum1
+        self.linNum2 = linNum2
+        self.seqLen =seqLen
+        self.lastOrAll = lastOrAll
+
+        self.dropRatio = dropRatio
+
+        if self.rnnBase =='lstm':
+            self.lstm = nn.LSTM(
+                input_size=self.inputSize,
+                hidden_size=self.hiddenSize,
+                num_layers=numLayer,
+                bias=True,
+                batch_first=True,
+                dropout= self.dropRatio
+            )
+
+        if self.lastOrAll == 'last':
+            self.lin1 = nn.Linear(in_features=self.hiddenSize, out_features=self.linNum1)
+        else:
+            self.lin1 = nn.Linear(in_features=self.hiddenSize * self.seqLen, out_features=self.linNum1)
+        self.lin2 = nn.Linear(in_features=self.linNum1, out_features=self.linNum2)
+        self.lin3 = nn.Linear(in_features=self.linNum2, out_features=3)
+
+
+    def forward(self, x):
+
+        out, (hidden,cell) = self.lstm(x)
+        out = F.leaky_relu(out)
+
+        if self.lastOrAll == 'last':
+            out=  F.leaky_relu(self.lin1(out[:,-1,:]))
+        else:
+            out = F.leaky_relu(self.lin1( out.view(out.size(0),-1)  ))
+        out = F.leaky_relu(self.lin2(out))
+        out = self.lin3(out)
+
+        return out
+
+
+
